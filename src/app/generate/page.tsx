@@ -16,7 +16,7 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024;
 type State =
   | { phase: "idle" }
   | { phase: "loading"; abort: AbortController }
-  | { phase: "result"; token: string; fileName: string }
+  | { phase: "result"; blobUrl: string; fileName: string }
   | { phase: "error"; message: string };
 
 export default function GeneratePage() {
@@ -27,6 +27,7 @@ export default function GeneratePage() {
 
   function reset() {
     if (state.phase === "loading") state.abort.abort();
+    if (state.phase === "result") URL.revokeObjectURL(state.blobUrl);
     setState({ phase: "idle" });
     setPrompt("");
     if (fileRef.current) fileRef.current.value = "";
@@ -58,12 +59,23 @@ export default function GeneratePage() {
 
     try {
       const res = await fetch("/api/generate", { method: "POST", body, signal: controller.signal });
-      const data = (await res.json()) as { token?: string; fileName?: string; error?: string };
-      if (!res.ok || !data.token) {
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
         setState({ phase: "error", message: data.error ?? "Something went wrong. Please try again." });
         return;
       }
-      setState({ phase: "result", token: data.token, fileName: data.fileName ?? "presentation.pptx" });
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] ?? "presentation.pptx";
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setState({ phase: "result", blobUrl, fileName });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") { setState({ phase: "idle" }); return; }
       setState({ phase: "error", message: "Network error. Please check your connection and try again." });
@@ -245,15 +257,15 @@ export default function GeneratePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-slate-700 truncate">{state.fileName}</p>
-                    <p className="text-xs text-slate-400">Ready to download · link expires in 1 hour</p>
+                    <p className="text-xs text-slate-400">Downloaded · click to save again</p>
                   </div>
                 </div>
-                <a href={`/api/download/${state.token}`} download={state.fileName} className="block">
+                <a href={state.blobUrl} download={state.fileName} className="block">
                   <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download presentation
+                    Download again
                   </Button>
                 </a>
                 <Button variant="outline" className="w-full" onClick={reset}>

@@ -1,5 +1,4 @@
 import mammoth from "mammoth";
-import { putToken } from "@/lib/token-store";
 
 export const maxDuration = 120;
 
@@ -154,6 +153,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const token = putToken(buffer, fileName, mimeType);
-  return Response.json({ token, fileName });
+  return new Response(buffer.buffer as ArrayBuffer, {
+    headers: {
+      "Content-Type": mimeType,
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Length": String(buffer.byteLength),
+      "Cache-Control": "no-store",
+    },
+  });
 }
