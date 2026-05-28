@@ -50,7 +50,6 @@ export async function POST(req: Request) {
     n8nRes = await fetch(webhookUrl, {
       method: "POST",
       body: outgoing,
-      signal: AbortSignal.timeout(115_000),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Request timed out";
@@ -78,9 +77,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // n8n must return { fileData: "<base64>", fileName: "...", mimeType: "..." }
+  // n8n returns { fileBase64: "<base64>", fileName: "...", mimeType: "..." }
   // Google Drive backup is handled inside the n8n workflow; the app never needs it.
-  const fileData = typeof data.fileData === "string" ? data.fileData : null;
+  const fileData =
+    typeof data.fileBase64 === "string" ? data.fileBase64 :
+    typeof data.fileData   === "string" ? data.fileData   : null;
   const fileName =
     typeof data.fileName === "string" && data.fileName.trim()
       ? data.fileName.trim()
