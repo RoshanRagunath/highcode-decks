@@ -4,5 +4,4 @@ ignoredBuiltDependencies:
   - msw
 allowBuilds:
   esbuild: true
-  msw: set this to true or false
   workerd: true
