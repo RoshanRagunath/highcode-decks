@@ -1,3 +1,5 @@
+import { putToken } from "@/lib/token-store";
+
 export const maxDuration = 120;
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -24,10 +26,7 @@ export async function POST(req: Request) {
   const prompt = formData.get("prompt") as string | null;
 
   if (!file && !prompt?.trim()) {
-    return Response.json(
-      { error: "Provide a file or a prompt" },
-      { status: 400 }
-    );
+    return Response.json({ error: "Provide a file or a prompt" }, { status: 400 });
   }
 
   if (file) {
@@ -38,10 +37,7 @@ export async function POST(req: Request) {
       );
     }
     if (file.size > 4 * 1024 * 1024) {
-      return Response.json(
-        { error: "File too large. Maximum size is 4 MB." },
-        { status: 413 }
-      );
+      return Response.json({ error: "File too large. Maximum size is 4 MB." }, { status: 413 });
     }
   }
 
@@ -72,9 +68,9 @@ export async function POST(req: Request) {
     );
   }
 
-  let data: unknown;
+  let data: Record<string, unknown>;
   try {
-    data = await n8nRes.json();
+    data = (await n8nRes.json()) as Record<string, unknown>;
   } catch {
     return Response.json(
       { error: "Generation service returned an unreadable response" },
@@ -82,16 +78,22 @@ export async function POST(req: Request) {
     );
   }
 
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    typeof (data as Record<string, unknown>).url !== "string"
-  ) {
+  // Expect { downloadUrl: string, fileName?: string } from n8n
+  const downloadUrl = typeof data.downloadUrl === "string" ? data.downloadUrl : null;
+  const fileName =
+    typeof data.fileName === "string" && data.fileName.trim()
+      ? data.fileName.trim()
+      : "presentation.pptx";
+
+  if (!downloadUrl) {
     return Response.json(
-      { error: "Generation service returned an unexpected response shape" },
+      {
+        error: `Generation service returned an unexpected response. Received keys: ${Object.keys(data).join(", ")}`,
+      },
       { status: 502 }
     );
   }
 
-  return Response.json({ url: (data as { url: string }).url });
+  const token = putToken(downloadUrl, fileName);
+  return Response.json({ token, fileName });
 }

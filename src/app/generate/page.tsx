@@ -16,7 +16,7 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024;
 type State =
   | { phase: "idle" }
   | { phase: "loading"; abort: AbortController }
-  | { phase: "result"; url: string }
+  | { phase: "result"; token: string; fileName: string }
   | { phase: "error"; message: string };
 
 export default function GeneratePage() {
@@ -58,12 +58,12 @@ export default function GeneratePage() {
 
     try {
       const res = await fetch("/api/generate", { method: "POST", body, signal: controller.signal });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
+      const data = (await res.json()) as { token?: string; fileName?: string; error?: string };
+      if (!res.ok || !data.token) {
         setState({ phase: "error", message: data.error ?? "Something went wrong. Please try again." });
         return;
       }
-      setState({ phase: "result", url: data.url });
+      setState({ phase: "result", token: data.token, fileName: data.fileName ?? "presentation.pptx" });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") { setState({ phase: "idle" }); return; }
       setState({ phase: "error", message: "Network error. Please check your connection and try again." });
@@ -241,15 +241,19 @@ export default function GeneratePage() {
               <CardContent className="pt-6 space-y-4">
                 <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-emerald-200">
                   <div className="h-8 w-8 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
-                    <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
+                    <FileText className="h-4 w-4 text-emerald-600" />
                   </div>
-                  <p className="text-xs text-slate-600 truncate flex-1 font-mono">{state.url}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-slate-700 truncate">{state.fileName}</p>
+                    <p className="text-xs text-slate-400">Ready to download · link expires in 1 hour</p>
+                  </div>
                 </div>
-                <a href={state.url} target="_blank" rel="noopener noreferrer" className="block">
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                    Open in Gamma ↗
+                <a href={`/api/download/${state.token}`} download={state.fileName} className="block">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download presentation
                   </Button>
                 </a>
                 <Button variant="outline" className="w-full" onClick={reset}>
