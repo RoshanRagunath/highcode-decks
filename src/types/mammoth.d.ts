@@ -3,5 +3,5 @@ declare module "mammoth" {
     value: string;
     messages: { type: string; message: string }[];
   }
-  function extractRawText(input: { arrayBuffer: ArrayBuffer }): Promise<Result>;
+  function extractRawText(input: { buffer: Buffer }): Promise<Result>;
 }

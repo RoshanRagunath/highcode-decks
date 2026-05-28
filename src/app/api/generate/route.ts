@@ -20,7 +20,8 @@ async function buildN8nRequest(
   // ── DOCX → extract text with mammoth, send as JSON prompt ──────────────
   if (file && file.type === DOCX_MIME) {
     const arrayBuffer = await file.arrayBuffer();
-    const { value: text } = await mammoth.extractRawText({ arrayBuffer });
+    const buffer = Buffer.from(arrayBuffer);
+    const { value: text } = await mammoth.extractRawText({ buffer });
     return {
       method: "POST",
       headers: { "Content-Type": "application/json" },
