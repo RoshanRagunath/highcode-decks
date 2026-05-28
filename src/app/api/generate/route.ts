@@ -1,13 +1,47 @@
+import mammoth from "mammoth";
 import { putToken } from "@/lib/token-store";
 
 export const maxDuration = 120;
 
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  DOCX_MIME,
   "text/plain",
   "text/markdown",
 ]);
+
+async function buildN8nRequest(
+  file: File | null,
+  prompt: string | null
+): Promise<RequestInit> {
+  // ── DOCX → extract text with mammoth, send as JSON prompt ──────────────
+  if (file && file.type === DOCX_MIME) {
+    const arrayBuffer = await file.arrayBuffer();
+    const { value: text } = await mammoth.extractRawText({ arrayBuffer });
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: text }),
+    };
+  }
+
+  // ── PDF / plain-text file → multipart FormData with "data" field ────────
+  if (file) {
+    const form = new FormData();
+    form.append("data", file);
+    return { method: "POST", body: form };
+  }
+
+  // ── Text prompt → JSON ───────────────────────────────────────────────────
+  return {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: prompt!.trim() }),
+  };
+}
 
 export async function POST(req: Request) {
   const webhookUrl = process.env.N8N_WEBHOOK_URL;
@@ -37,22 +71,29 @@ export async function POST(req: Request) {
       );
     }
     if (file.size > 4 * 1024 * 1024) {
-      return Response.json({ error: "File too large. Maximum size is 4 MB." }, { status: 413 });
+      return Response.json(
+        { error: "File too large. Maximum size is 4 MB." },
+        { status: 413 }
+      );
     }
   }
 
-  const outgoing = new FormData();
-  if (file) outgoing.append("file", file, file.name);
-  if (prompt?.trim()) outgoing.append("prompt", prompt.trim());
+  let n8nRequest: RequestInit;
+  try {
+    n8nRequest = await buildN8nRequest(file, prompt);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return Response.json(
+      { error: `Failed to prepare file: ${message}` },
+      { status: 422 }
+    );
+  }
 
   let n8nRes: Response;
   try {
-    n8nRes = await fetch(webhookUrl, {
-      method: "POST",
-      body: outgoing,
-    });
+    n8nRes = await fetch(webhookUrl, n8nRequest);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Request timed out";
+    const message = err instanceof Error ? err.message : "Request failed";
     return Response.json(
       { error: `Could not reach the generation service: ${message}` },
       { status: 502 }
@@ -77,15 +118,15 @@ export async function POST(req: Request) {
     );
   }
 
-  // n8n returns { fileBase64: "<base64>", fileName: "...", mimeType: "..." }
-  // Google Drive backup is handled inside the n8n workflow; the app never needs it.
   const fileData =
     typeof data.fileBase64 === "string" ? data.fileBase64 :
     typeof data.fileData   === "string" ? data.fileData   : null;
+
   const fileName =
     typeof data.fileName === "string" && data.fileName.trim()
       ? data.fileName.trim()
       : "presentation.pptx";
+
   const mimeType =
     typeof data.mimeType === "string" && data.mimeType.trim()
       ? data.mimeType.trim()
@@ -100,7 +141,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Decode base64 → binary
   let buffer: Uint8Array;
   try {
     const binary = atob(fileData);
