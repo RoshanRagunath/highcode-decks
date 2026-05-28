@@ -111,6 +111,7 @@ export default function Home() {
               <Tabs
                 value={tab}
                 onValueChange={(v) => setTab(v as "file" | "prompt")}
+                className="flex-col"
               >
                 <TabsList className="w-full">
                   <TabsTrigger value="file" className="flex-1">
