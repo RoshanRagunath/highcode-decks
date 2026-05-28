@@ -78,14 +78,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // Expect { downloadUrl: string, fileName?: string } from n8n
-  const downloadUrl = typeof data.downloadUrl === "string" ? data.downloadUrl : null;
+  // n8n must return { fileData: "<base64>", fileName: "...", mimeType: "..." }
+  // Google Drive backup is handled inside the n8n workflow; the app never needs it.
+  const fileData = typeof data.fileData === "string" ? data.fileData : null;
   const fileName =
     typeof data.fileName === "string" && data.fileName.trim()
       ? data.fileName.trim()
       : "presentation.pptx";
+  const mimeType =
+    typeof data.mimeType === "string" && data.mimeType.trim()
+      ? data.mimeType.trim()
+      : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
-  if (!downloadUrl) {
+  if (!fileData) {
     return Response.json(
       {
         error: `Generation service returned an unexpected response. Received keys: ${Object.keys(data).join(", ")}`,
@@ -94,6 +99,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const token = putToken(downloadUrl, fileName);
+  // Decode base64 → binary
+  let buffer: Uint8Array;
+  try {
+    const binary = atob(fileData);
+    buffer = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+  } catch {
+    return Response.json(
+      { error: "Generation service returned invalid file data" },
+      { status: 502 }
+    );
+  }
+
+  const token = putToken(buffer, fileName, mimeType);
   return Response.json({ token, fileName });
 }

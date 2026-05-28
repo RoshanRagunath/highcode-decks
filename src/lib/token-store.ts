@@ -1,16 +1,21 @@
 const TTL_MS = 60 * 60 * 1000; // 1 hour
 
 interface DownloadEntry {
-  downloadUrl: string;
+  buffer: Uint8Array;
   fileName: string;
+  mimeType: string;
   expiresAt: number;
 }
 
 const store = new Map<string, DownloadEntry>();
 
-export function putToken(downloadUrl: string, fileName: string): string {
+export function putToken(
+  buffer: Uint8Array,
+  fileName: string,
+  mimeType: string
+): string {
   const token = crypto.randomUUID();
-  store.set(token, { downloadUrl, fileName, expiresAt: Date.now() + TTL_MS });
+  store.set(token, { buffer, fileName, mimeType, expiresAt: Date.now() + TTL_MS });
   return token;
 }
 
