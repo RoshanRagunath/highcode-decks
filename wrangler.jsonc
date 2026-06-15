@@ -14,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "gamma-generator-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "a09ecdc0-bcd9-48d2-bb52-cfe0aa5dd4da",
       "migrations_dir": "migrations"
     }
   ],
