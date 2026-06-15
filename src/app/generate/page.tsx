@@ -81,7 +81,17 @@ export default function GeneratePage() {
         return;
       }
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
+        // Gateway / timeout statuses come back as HTML (not our JSON), and the
+        // generation may still have run long. Give an accurate, retryable message.
+        if ([502, 503, 504, 522, 524].includes(res.status)) {
+          setState({
+            phase: "error",
+            message:
+              "The presentation took too long to come back (this can happen on big or busy generations). It may still finish in the background — please try again.",
+          });
+          return;
+        }
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
         setState({ phase: "error", message: data.error ?? "Something went wrong. Please try again." });
         return;
       }
@@ -99,7 +109,11 @@ export default function GeneratePage() {
       setState({ phase: "result", blobUrl, fileName });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") { setState({ phase: "idle" }); return; }
-      setState({ phase: "error", message: "Network error. Please check your connection and try again." });
+      setState({
+        phase: "error",
+        message:
+          "The connection dropped before the presentation finished (generation can take up to ~2 minutes). It may still complete in the background — please try again in a moment.",
+      });
     }
   }
 
