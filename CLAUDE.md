@@ -12,7 +12,7 @@ Public web app that lets anyone upload a document (PDF, DOCX, TXT, MD) or write 
 |---|---|---|
 | Framework | Next.js 16 App Router | Flexible, Tailwind built-in, easy API routes |
 | UI | shadcn/ui + Tailwind v4 | Polished baseline, full ownership of component code |
-| Auth | None | Public MVP tool |
+| Auth | Shared-password gate | Signed httpOnly cookie verified in middleware; no per-user accounts needed |
 | Backend / DB | None — single API route proxies to n8n | No persistence needed |
 | Deploy | Cloudflare Workers via OpenNext | Personal Cloudflare account, subdomain on highcode.nl |
 
@@ -39,6 +39,8 @@ See `.env.example` for the full list. For local dev copy `.env.example` → `.en
 For Cloudflare Workers preview copy to `.dev.vars`. For production use `wrangler secret put`.
 
 - `N8N_WEBHOOK_URL` — full URL of the n8n webhook that handles generation. Server-side only (never `NEXT_PUBLIC_`).
+- `ACCESS_PASSWORD` — shared password users enter on `/login` to access `/generate`. Server-side only.
+- `AUTH_SECRET` — random 32+ byte secret used to sign session cookies (HMAC-SHA256). Generate with `openssl rand -base64 32`. Server-side only.
 
 ## Deploy
 
@@ -49,6 +51,11 @@ For Cloudflare Workers preview copy to `.dev.vars`. For production use `wrangler
 
 ## Architecture notes
 
+- Access gate: `src/middleware.ts` guards `/generate` and `/api/generate`. A valid signed
+  `gg_session` httpOnly cookie is required; otherwise page requests redirect to `/login` and
+  API requests get a `401`. The cookie is set by `/api/login` (checks `ACCESS_PASSWORD`,
+  signs with `AUTH_SECRET`) and cleared by `/api/logout`. Sign/verify logic lives in
+  `src/lib/auth.ts` using Web Crypto (`crypto.subtle`) so it runs at the edge / on Workers.
 - Single API route at `/api/generate` accepts `multipart/form-data` with a `file` (File) and/or `prompt` (string) field.
 - Server validates MIME type and file size before forwarding to n8n.
 - n8n is expected to return `{ url: string }` JSON. If the shape differs, update the destructuring in `src/app/api/generate/route.ts`.

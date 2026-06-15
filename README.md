@@ -12,9 +12,16 @@ Upload a document (PDF, DOCX, TXT, MD) or write a prompt to generate a Gamma pre
 
 ```bash
 cp .env.example .env.local
-# Fill in N8N_WEBHOOK_URL in .env.local
+# Fill in N8N_WEBHOOK_URL, ACCESS_PASSWORD, and AUTH_SECRET in .env.local
+# Generate a secret: openssl rand -base64 32
 pnpm install
 ```
+
+## Access gate
+
+`/generate` (and the underlying `/api/generate`) are protected by a single shared
+password. Visitors are redirected to `/login`; entering the correct `ACCESS_PASSWORD`
+sets a signed httpOnly session cookie (valid 7 days). There are no per-user accounts.
 
 ## Run commands
 
@@ -32,10 +39,13 @@ pnpm deploy     # deploy to Cloudflare Workers
 | Variable | Required | Description |
 |---|---|---|
 | `N8N_WEBHOOK_URL` | Yes | Full URL of the n8n webhook — server-side only |
+| `ACCESS_PASSWORD` | Yes | Shared password for the `/login` gate — server-side only |
+| `AUTH_SECRET` | Yes | Random secret signing session cookies (`openssl rand -base64 32`) — server-side only |
 
 For local dev: `.env.local`  
 For Cloudflare Workers preview: `.dev.vars`  
-For production: `pnpm dlx wrangler secret put N8N_WEBHOOK_URL`
+For production: set each secret with `pnpm dlx wrangler secret put <NAME>`
+(`N8N_WEBHOOK_URL`, `ACCESS_PASSWORD`, `AUTH_SECRET`)
 
 ## Deploy (Cloudflare Workers)
 
@@ -43,6 +53,8 @@ For production: `pnpm dlx wrangler secret put N8N_WEBHOOK_URL`
 pnpm dlx wrangler login          # authenticate (personal account)
 wrangler whoami                  # verify correct account
 pnpm dlx wrangler secret put N8N_WEBHOOK_URL
+pnpm dlx wrangler secret put ACCESS_PASSWORD
+pnpm dlx wrangler secret put AUTH_SECRET
 pnpm deploy                      # build + deploy
 ```
 

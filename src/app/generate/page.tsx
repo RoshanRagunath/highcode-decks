@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export default function GeneratePage() {
   const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<State>({ phase: "idle" });
   const fileRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   function reset() {
     if (state.phase === "loading") state.abort.abort();
@@ -59,6 +61,11 @@ export default function GeneratePage() {
 
     try {
       const res = await fetch("/api/generate", { method: "POST", body, signal: controller.signal });
+      if (res.status === 401) {
+        setState({ phase: "error", message: "Your session has expired. Redirecting to login…" });
+        router.push("/login?from=/generate");
+        return;
+      }
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
         setState({ phase: "error", message: data.error ?? "Something went wrong. Please try again." });
