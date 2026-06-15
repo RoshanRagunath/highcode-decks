@@ -51,7 +51,7 @@ For Cloudflare Workers preview copy to `.dev.vars`. For production use `wrangler
 
 ## Architecture notes
 
-- Access gate: `src/middleware.ts` guards `/generate` and `/api/generate`. A valid signed
+- Access gate: `src/proxy.ts` (Next 16 proxy/middleware convention) guards `/generate` and `/api/generate`. A valid signed
   `gg_session` httpOnly cookie is required; otherwise page requests redirect to `/login` and
   API requests get a `401`. The cookie is set by `/api/login` (checks `ACCESS_PASSWORD`,
   signs with `AUTH_SECRET`) and cleared by `/api/logout`. Sign/verify logic lives in

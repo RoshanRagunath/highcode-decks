@@ -7,7 +7,7 @@ export const config = {
   matcher: ["/generate/:path*", "/api/generate/:path*"],
 };
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   const valid = await verifySession(process.env.AUTH_SECRET, token);
   if (valid) return NextResponse.next();
