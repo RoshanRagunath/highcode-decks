@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Layers } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ function safeFrom(from: string | null): string {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -40,8 +39,10 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      router.push(safeFrom(searchParams.get("from")));
-      router.refresh();
+      // Hard navigation so the server-rendered, session-gated target reliably
+      // picks up the freshly set cookie (a soft router.push can race the gate).
+      window.location.href = safeFrom(searchParams.get("from"));
+      return;
     } catch {
       setError("Network error. Please check your connection and try again.");
       setLoading(false);
