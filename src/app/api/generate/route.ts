@@ -1,4 +1,6 @@
 import mammoth from "mammoth";
+import { getSession } from "@/lib/session";
+import { findById } from "@/lib/users";
 
 export const maxDuration = 120;
 
@@ -14,7 +16,8 @@ const ALLOWED_MIME_TYPES = new Set([
 
 async function buildN8nRequest(
   file: File | null,
-  prompt: string | null
+  prompt: string | null,
+  themeId: string | null
 ): Promise<RequestInit> {
   // ── DOCX → extract text with mammoth, send as JSON prompt ──────────────
   if (file && file.type === DOCX_MIME) {
@@ -24,7 +27,7 @@ async function buildN8nRequest(
     return {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: text }),
+      body: JSON.stringify({ prompt: text, themeId }),
     };
   }
 
@@ -32,6 +35,7 @@ async function buildN8nRequest(
   if (file) {
     const form = new FormData();
     form.append("data", file);
+    if (themeId) form.append("themeId", themeId);
     return { method: "POST", body: form };
   }
 
@@ -39,7 +43,7 @@ async function buildN8nRequest(
   return {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: prompt!.trim() }),
+    body: JSON.stringify({ prompt: prompt!.trim(), themeId }),
   };
 }
 
@@ -48,6 +52,15 @@ export async function POST(req: Request) {
   if (!webhookUrl) {
     return Response.json({ error: "Server misconfiguration" }, { status: 500 });
   }
+
+  // Identify the logged-in user and read their current theme from the DB, so an
+  // admin's theme change takes effect immediately and a deleted user fails closed.
+  const session = await getSession();
+  const user = session ? await findById(session.uid) : null;
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const themeId = user.themeId;
 
   let formData: FormData;
   try {
@@ -80,7 +93,7 @@ export async function POST(req: Request) {
 
   let n8nRequest: RequestInit;
   try {
-    n8nRequest = await buildN8nRequest(file, prompt);
+    n8nRequest = await buildN8nRequest(file, prompt, themeId);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return Response.json(

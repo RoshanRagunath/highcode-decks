@@ -2,31 +2,50 @@ import { cookies } from "next/headers";
 import {
   COOKIE_NAME,
   SESSION_TTL_MS,
-  passwordMatches,
   signSession,
+  verifyPassword,
 } from "@/lib/auth";
+import { ensureSeeded, findByUsername } from "@/lib/users";
 
 export async function POST(req: Request) {
-  const accessPassword = process.env.ACCESS_PASSWORD;
   const authSecret = process.env.AUTH_SECRET;
-  if (!accessPassword || !authSecret) {
+  if (!authSecret) {
     return Response.json({ error: "Server misconfiguration" }, { status: 500 });
   }
 
-  let body: { password?: unknown };
+  let body: { username?: unknown; password?: unknown };
   try {
-    body = (await req.json()) as { password?: unknown };
+    body = (await req.json()) as { username?: unknown; password?: unknown };
   } catch {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!passwordMatches(password, accessPassword)) {
-    return Response.json({ error: "Incorrect password." }, { status: 401 });
+  if (!username || !password) {
+    return Response.json(
+      { error: "Incorrect username or password." },
+      { status: 401 }
+    );
   }
 
-  const expMs = Date.now() + SESSION_TTL_MS;
-  const value = await signSession(authSecret, expMs);
+  // Bootstrap the first admin from env on the very first login.
+  await ensureSeeded();
+
+  const user = await findByUsername(username);
+  const ok = user ? await verifyPassword(password, user.passwordHash) : false;
+  if (!user || !ok) {
+    return Response.json(
+      { error: "Incorrect username or password." },
+      { status: 401 }
+    );
+  }
+
+  const value = await signSession(authSecret, {
+    uid: user.id,
+    role: user.role,
+    exp: Date.now() + SESSION_TTL_MS,
+  });
 
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, value, {
@@ -37,5 +56,5 @@ export async function POST(req: Request) {
     maxAge: Math.floor(SESSION_TTL_MS / 1000),
   });
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, role: user.role });
 }

@@ -19,6 +19,7 @@ function safeFrom(from: string | null): string {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ function LoginForm() {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -55,14 +56,30 @@ function LoginForm() {
             <Lock className="h-5 w-5 text-white" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Enter access password
+            Sign in to Presento
           </h1>
           <p className="text-slate-500 text-sm">
-            Presento is invite-only. Enter the shared password to generate presentations.
+            Presento is invite-only. Sign in with your account to generate presentations.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="username" className="text-sm font-medium">
+              Username
+            </Label>
+            <Input
+              id="username"
+              type="text"
+              autoComplete="username"
+              autoFocus
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={loading}
+              required
+            />
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="password" className="text-sm font-medium">
               Password
@@ -71,7 +88,6 @@ function LoginForm() {
               id="password"
               type="password"
               autoComplete="current-password"
-              autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
@@ -85,7 +101,7 @@ function LoginForm() {
             </Alert>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading || !password}>
+          <Button type="submit" className="w-full" disabled={loading || !username || !password}>
             {loading ? "Checking…" : "Continue"}
           </Button>
         </form>
