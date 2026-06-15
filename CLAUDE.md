@@ -76,7 +76,7 @@ D1 binding: `DB` (database `gamma-generator-db`) — declared in `wrangler.jsonc
   so admin theme changes apply on the next generation and deleted users fail closed (`401`).
 - Single API route at `/api/generate` accepts `multipart/form-data` with a `file` (File) and/or `prompt` (string) field.
 - Server validates MIME type and file size before forwarding to n8n.
-- n8n is expected to return `{ url: string }` JSON. If the shape differs, update the destructuring in `src/app/api/generate/route.ts`.
+- n8n returns `{ fileBase64 | fileData, fileName?, mimeType? }`; if the shape differs, update the destructuring in `src/app/api/generate/route.ts`.
 - `maxDuration = 120` gives headroom for slow n8n runs. Cloudflare Workers Paid plan recommended ($5/mo).
 - No rate-limiting in MVP. If abuse occurs, add a shared-secret query param or Cloudflare WAF rule.
 
@@ -85,7 +85,15 @@ D1 binding: `DB` (database `gamma-generator-db`) — declared in `wrangler.jsonc
 - `.npmrc` has `ignore-scripts=true` to avoid pnpm v11 build-approval prompts for `sharp` and `unrs-resolver`. These native modules are not needed for this app.
 - OpenNext generates `wrangler.jsonc` and `open-next.config.ts` — commit both.
 - Keep `.dev.vars` and `.env.local` out of git (already in `.gitignore`).
-- n8n response shape assumed to be `{ url: string }`. Verify against the real workflow before production.
+- n8n returns `{ fileBase64 | fileData, fileName?, mimeType? }`; `/api/generate` decodes it to a binary download. Verified live (returns a real `.pptx`).
+
+### Deploy gotchas (Next 16 + OpenNext on Cloudflare) — all already handled in-repo
+
+- **Build must use Webpack, not Turbopack.** Next 16's `next build` defaults to Turbopack, whose chunks fail at runtime on Workers (`ChunkLoadError`). The `build` script is `next build --webpack`. Do not remove `--webpack`. (`next dev` still uses Turbopack — fine.)
+- **`NEXT_PRIVATE_MINIMAL_MODE=1`** is set in `wrangler.jsonc` `vars`. Without it the worker 500s with `Dynamic require of ".../middleware-manifest.json" is not supported`. Safe because there is no Next middleware (auth is in layouts/handlers). See opennextjs-cloudflare #1232.
+- **No Next middleware/`proxy.ts`.** Next 16 proxy is Node-runtime-only and OpenNext doesn't support it — gating lives in route layouts + handlers instead.
+- **Windows symlink permission:** `pnpm deploy`'s OpenNext bundling needs symlink rights — enable Windows **Developer Mode** (or run elevated), else `EPERM: symlink`.
+- **Deploy = `pnpm deploy`** (`opennextjs-cloudflare build` runs `pnpm build` → webpack). Live at `https://gamma-generator.roshan-58.workers.dev` (custom domain `gamma.highcode.nl` wired separately in the CF dashboard).
 
 ## Workflow
 
