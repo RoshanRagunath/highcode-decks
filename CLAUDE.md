@@ -56,10 +56,15 @@ D1 binding: `DB` (database `gamma-generator-db`) — declared in `wrangler.jsonc
 
 ## Architecture notes
 
-- Access gate: `src/proxy.ts` (Next 16 proxy/middleware convention) guards `/generate`,
-  `/api/generate`, `/admin`, `/api/admin`. It verifies the signed `gg_session` cookie (no DB
-  round-trip — the cookie carries `{ uid, role }`); `/admin*` additionally requires
-  `role === "admin"`. Page misses redirect to `/login`; API misses return `401`/`403`.
+- Access gate: enforced per-route, NOT via middleware. Next 16's middleware/"proxy" runs only
+  on the Node runtime, which OpenNext Cloudflare doesn't support — so there is no `proxy.ts`.
+  Instead:
+  - Page gates are server-component layouts: `src/app/generate/layout.tsx` (requires a session)
+    and `src/app/admin/layout.tsx` (requires `role === "admin"`). They call `getSession()` and
+    `redirect()` on failure.
+  - API routes self-protect in their handlers (`/api/generate` and `/api/me` call `getSession()`;
+    `/api/admin/*` call `requireAdmin()`).
+  The signed `gg_session` cookie carries `{ uid, role }`, verified with `AUTH_SECRET`.
 - Auth primitives in `src/lib/auth.ts` (Web Crypto, edge-safe): session sign/verify (HMAC) +
   PBKDF2 password hashing. `src/lib/session.ts` reads the current session in route handlers.
 - Users live in D1, accessed only through `src/lib/users.ts` (the one SQL file; binding `DB`
