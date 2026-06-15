@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Sparkles } from "lucide-react";
+import { ArrowLeft, FileText, Sparkles, LogOut, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,20 @@ export default function GeneratePage() {
   const [state, setState] = useState<State>({ phase: "idle" });
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [me, setMe] = useState<{ name: string; role: "admin" | "user" } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((res) => res.json())
+      .then((data: { user: { name: string; role: "admin" | "user" } | null }) => setMe(data.user))
+      .catch(() => {});
+  }, []);
+
+  async function handleLogout() {
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
+    router.push("/login");
+    router.refresh();
+  }
 
   function reset() {
     if (state.phase === "loading") state.abort.abort();
@@ -100,9 +114,22 @@ export default function GeneratePage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm font-medium">Presento</span>
           </Link>
-          <div className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs text-slate-500">Powered by Gamma AI</span>
+          <div className="flex items-center gap-2">
+            {me && (
+              <span className="text-xs text-slate-500 hidden sm:inline">{me.name}</span>
+            )}
+            {me?.role === "admin" && (
+              <Link href="/admin">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <Settings className="h-3.5 w-3.5" />
+                  Admin
+                </Button>
+              </Link>
+            )}
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleLogout}>
+              <LogOut className="h-3.5 w-3.5" />
+              Log out
+            </Button>
           </div>
         </div>
       </header>

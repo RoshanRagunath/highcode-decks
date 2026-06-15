@@ -8,6 +8,16 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Users + per-user Gamma theme IDs. Create with `wrangler d1 create gamma-generator-db`
+  // and paste the returned database_id below before deploying.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gamma-generator-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": {
     "enabled": true
   }

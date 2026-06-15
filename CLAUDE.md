@@ -12,8 +12,8 @@ Public web app that lets anyone upload a document (PDF, DOCX, TXT, MD) or write 
 |---|---|---|
 | Framework | Next.js 16 App Router | Flexible, Tailwind built-in, easy API routes |
 | UI | shadcn/ui + Tailwind v4 | Polished baseline, full ownership of component code |
-| Auth | Shared-password gate | Signed httpOnly cookie verified in middleware; no per-user accounts needed |
-| Backend / DB | None — single API route proxies to n8n | No persistence needed |
+| Auth | Per-user accounts (username + password) | PBKDF2-hashed passwords; signed httpOnly cookie carries `{ uid, role }`; verified in proxy/middleware |
+| Backend / DB | Cloudflare D1 (`users` table) + API route proxy to n8n | Per-user accounts + each user's Gamma `themeId` |
 | Deploy | Cloudflare Workers via OpenNext | Personal Cloudflare account, subdomain on highcode.nl |
 
 Toolkit references consulted: `toolkits/fullstack/nextjs.md`, `toolkits/ui/shadcn-ui.md`, `toolkits/deploy/cloudflare.md`
@@ -39,8 +39,11 @@ See `.env.example` for the full list. For local dev copy `.env.example` → `.en
 For Cloudflare Workers preview copy to `.dev.vars`. For production use `wrangler secret put`.
 
 - `N8N_WEBHOOK_URL` — full URL of the n8n webhook that handles generation. Server-side only (never `NEXT_PUBLIC_`).
-- `ACCESS_PASSWORD` — shared password users enter on `/login` to access `/generate`. Server-side only.
 - `AUTH_SECRET` — random 32+ byte secret used to sign session cookies (HMAC-SHA256). Generate with `openssl rand -base64 32`. Server-side only.
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD` — bootstrap admin. The first admin account is seeded from these on first login if no admin exists. Server-side only.
+
+D1 binding: `DB` (database `gamma-generator-db`) — declared in `wrangler.jsonc`. Run
+`pnpm cf-typegen` after changing bindings to regenerate `cloudflare-env.d.ts`.
 
 ## Deploy
 
@@ -51,11 +54,19 @@ For Cloudflare Workers preview copy to `.dev.vars`. For production use `wrangler
 
 ## Architecture notes
 
-- Access gate: `src/proxy.ts` (Next 16 proxy/middleware convention) guards `/generate` and `/api/generate`. A valid signed
-  `gg_session` httpOnly cookie is required; otherwise page requests redirect to `/login` and
-  API requests get a `401`. The cookie is set by `/api/login` (checks `ACCESS_PASSWORD`,
-  signs with `AUTH_SECRET`) and cleared by `/api/logout`. Sign/verify logic lives in
-  `src/lib/auth.ts` using Web Crypto (`crypto.subtle`) so it runs at the edge / on Workers.
+- Access gate: `src/proxy.ts` (Next 16 proxy/middleware convention) guards `/generate`,
+  `/api/generate`, `/admin`, `/api/admin`. It verifies the signed `gg_session` cookie (no DB
+  round-trip — the cookie carries `{ uid, role }`); `/admin*` additionally requires
+  `role === "admin"`. Page misses redirect to `/login`; API misses return `401`/`403`.
+- Auth primitives in `src/lib/auth.ts` (Web Crypto, edge-safe): session sign/verify (HMAC) +
+  PBKDF2 password hashing. `src/lib/session.ts` reads the current session in route handlers.
+- Users live in D1, accessed only through `src/lib/users.ts` (the one SQL file; binding `DB`
+  via `getCloudflareContext()`). `ensureSeeded()` creates the first admin from
+  `ADMIN_USERNAME`/`ADMIN_PASSWORD`. Schema in `migrations/0001_init.sql`.
+- Admin UI at `/admin` (CRUD via `/api/admin/users[/:id]`); each handler re-checks admin role.
+- `/api/generate` looks up the logged-in user, reads their current `themeId`, and injects it
+  into the n8n payload (JSON `themeId` field, or `form.append("themeId", …)` for file uploads),
+  so admin theme changes apply on the next generation and deleted users fail closed (`401`).
 - Single API route at `/api/generate` accepts `multipart/form-data` with a `file` (File) and/or `prompt` (string) field.
 - Server validates MIME type and file size before forwarding to n8n.
 - n8n is expected to return `{ url: string }` JSON. If the shape differs, update the destructuring in `src/app/api/generate/route.ts`.
