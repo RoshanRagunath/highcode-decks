@@ -46,6 +46,10 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    // Fetch-on-mount: every setState inside load() runs after the await (a later
+    // microtask), not synchronously, so it doesn't cause the cascading renders
+    // this rule guards against.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 

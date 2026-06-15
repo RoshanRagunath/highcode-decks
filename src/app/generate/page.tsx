@@ -30,8 +30,8 @@ export default function GeneratePage() {
 
   useEffect(() => {
     fetch("/api/me")
-      .then((res) => res.json())
-      .then((data: { user: { name: string; role: "admin" | "user" } | null }) => setMe(data.user))
+      .then((res) => res.json() as Promise<{ user: { name: string; role: "admin" | "user" } | null }>)
+      .then((data) => setMe(data.user))
       .catch(() => {});
   }, []);
 
