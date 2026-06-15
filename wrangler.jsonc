@@ -4,6 +4,12 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-01-13",
   "compatibility_flags": ["nodejs_compat"],
+  // Skips Next's dynamic require() of middleware-manifest.json, which the Workers
+  // runtime can't do. Safe here: we have no Next middleware (auth is enforced in
+  // route-level layouts + handlers). See opennextjs-cloudflare issue #1232.
+  "vars": {
+    "NEXT_PRIVATE_MINIMAL_MODE": "1"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
