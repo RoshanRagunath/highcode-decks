@@ -1,6 +1,8 @@
-# Gamma Presentation Generator
+# Decks — Highcode
 
-Upload a document (PDF, DOCX, TXT, MD) or write a prompt to generate a Gamma presentation. The generation logic is handled by an n8n workflow; this app is the front-end + API proxy.
+Internal **Decks** app (a Highcode product): signed-in users upload a document (PDF, DOCX, TXT, MD) or write a prompt to generate a Gamma presentation using their assigned theme. The generation logic is handled by an n8n workflow; this app is the front-end + API proxy + per-user accounts.
+
+> Internal repo/worker/domain names remain `gamma-generator` / `gamma.highcode.nl`; "Decks" is the user-facing product name.
 
 ## Prerequisites
 

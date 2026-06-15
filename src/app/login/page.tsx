@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Layers } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,14 +52,17 @@ function LoginForm() {
     <Card className="w-full max-w-sm shadow-sm border-slate-200">
       <CardContent className="pt-6">
         <div className="mb-6 flex flex-col items-center text-center space-y-2">
-          <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center">
-            <Lock className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <Layers className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-lg font-bold text-slate-900 tracking-tight">Decks</span>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Sign in to Presento
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight pt-1">
+            Sign in
           </h1>
           <p className="text-slate-500 text-sm">
-            Presento is invite-only. Sign in with your account to generate presentations.
+            Sign in with your account to start building presentations.
           </p>
         </div>
 
@@ -112,10 +115,11 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 flex flex-col items-center justify-center px-4 gap-4">
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>
+      <p className="text-xs text-slate-400">A Highcode app · powered by Gamma</p>
     </div>
   );
 }

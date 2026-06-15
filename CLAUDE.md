@@ -4,7 +4,9 @@
 
 ## Purpose
 
-Public web app that lets anyone upload a document (PDF, DOCX, TXT, MD) or write a text prompt to generate a Gamma presentation. The actual generation logic lives in an existing n8n workflow. This app is a polished front-end + thin Next.js API proxy that hides the webhook URL and adds server-side validation.
+**Decks** (user-facing product name; a Highcode app) — an invite-only web app where signed-in users upload a document (PDF, DOCX, TXT, MD) or write a text prompt to generate a Gamma presentation using the Gamma theme assigned to their account. The actual generation logic lives in an existing n8n workflow. This app is a polished front-end + thin Next.js API proxy that hides the webhook URL, adds per-user accounts, and adds server-side validation.
+
+> Branding note: the user-facing name is **Decks**, but the repo, Cloudflare Worker, and domain keep the original `gamma-generator` / `gamma.highcode.nl` names.
 
 ## Stack
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Sparkles, LogOut, Settings } from "lucide-react";
+import { FileText, Sparkles, LogOut, Settings, Layers } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,10 +110,12 @@ export default function GeneratePage() {
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Presento</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <Layers className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-base font-bold text-slate-900 tracking-tight">Decks</span>
+          </div>
           <div className="flex items-center gap-2">
             {me && (
               <span className="text-xs text-slate-500 hidden sm:inline">{me.name}</span>

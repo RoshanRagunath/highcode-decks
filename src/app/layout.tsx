@@ -8,9 +8,9 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Presento — AI Presentation Generator",
+  title: "Decks — Highcode",
   description:
-    "Upload a document or write a prompt to generate a beautiful, shareable Gamma presentation in under a minute.",
+    "Generate on-brand presentations from a document or a prompt. A Highcode app.",
 };
 
 export default function RootLayout({
