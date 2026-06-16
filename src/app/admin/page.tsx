@@ -105,7 +105,7 @@ export default function AdminPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manage users</h1>
           <p className="text-slate-500 text-sm">
-            Group users by client to share a Gamma theme, or set a per-user override. Each
+            Group users by client to share a Gamma theme or set a per-user override. Each
             presentation uses the override if set, otherwise the user&apos;s group theme.
           </p>
         </div>
@@ -494,7 +494,7 @@ function CreateUser({ groups, onCreated }: { groups: Group[]; onCreated: () => v
                 id="c-theme"
                 value={themeId}
                 onChange={(e) => setThemeId(e.target.value)}
-                placeholder="optional — overrides group theme"
+                placeholder="optional, overrides group theme"
               />
             </div>
             <div className="space-y-1.5">
@@ -697,7 +697,7 @@ function UserRow({
                 id={`e-theme-${user.id}`}
                 value={themeId}
                 onChange={(e) => setThemeId(e.target.value)}
-                placeholder="optional — overrides group theme"
+                placeholder="optional, overrides group theme"
               />
             </div>
             <div className="space-y-1.5">

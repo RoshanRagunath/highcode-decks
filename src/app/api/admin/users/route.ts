@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
   if (!username || !name || password.length < 8) {
     return Response.json(
-      { error: "username, name, and a password of at least 8 characters are required." },
+      { error: "username, name and a password of at least 8 characters are required." },
       { status: 400 }
     );
   }

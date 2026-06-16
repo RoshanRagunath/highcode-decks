@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   if (file) {
     if (!ALLOWED_MIME_TYPES.has(file.type)) {
       return Response.json(
-        { error: "Unsupported file type. Upload a PDF, DOCX, TXT, or MD file." },
+        { error: "Unsupported file type. Upload a PDF, DOCX, TXT or MD file." },
         { status: 415 }
       );
     }

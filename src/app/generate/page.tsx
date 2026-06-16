@@ -87,7 +87,7 @@ export default function GeneratePage() {
           setState({
             phase: "error",
             message:
-              "The presentation took too long to come back (this can happen on big or busy generations). It may still finish in the background — please try again.",
+              "The presentation took too long to come back (this can happen on big or busy generations). It may still finish in the background. Please try again.",
           });
           return;
         }
@@ -112,7 +112,7 @@ export default function GeneratePage() {
       setState({
         phase: "error",
         message:
-          "The connection dropped before the presentation finished (generation can take up to ~2 minutes). It may still complete in the background — please try again in a moment.",
+          "The connection dropped before the presentation finished (generation can take up to ~2 minutes). It may still complete in the background. Please try again in a moment.",
       });
     }
   }
@@ -159,7 +159,7 @@ export default function GeneratePage() {
                 Create your presentation
               </h1>
               <p className="text-slate-500 text-sm">
-                Write a prompt or upload a document — we&apos;ll generate a full Gamma presentation in under a minute.
+                Write a prompt or upload a document, and we&apos;ll generate a full Gamma presentation in under a minute.
               </p>
             </div>
 
@@ -207,12 +207,12 @@ export default function GeneratePage() {
                           Describe your presentation
                         </Label>
                         <p className="text-xs text-slate-400">
-                          Be specific about the topic, audience, tone, and number of slides.
+                          Be specific about the topic, audience, tone and number of slides.
                         </p>
                       </div>
                       <Textarea
                         id="prompt"
-                        placeholder="e.g. Create a 10-slide investor pitch deck for a B2B SaaS that helps teams track OKRs. Audience is Series A VCs. Include market size, product overview, traction, and ask."
+                        placeholder="e.g. Create a 10-slide investor pitch deck for a B2B SaaS that helps teams track OKRs. Audience is Series A VCs. Include market size, product overview, traction and ask."
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         disabled={isLoading}
@@ -228,7 +228,7 @@ export default function GeneratePage() {
                           Upload your document
                         </Label>
                         <p className="text-xs text-slate-400">
-                          PDF, DOCX, TXT, or MD — max 4 MB. We&apos;ll turn it into a full presentation.
+                          PDF, DOCX, TXT or MD, max 4 MB. We&apos;ll turn it into a full presentation.
                         </p>
                       </div>
                       <Input

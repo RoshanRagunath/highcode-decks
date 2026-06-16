@@ -8,7 +8,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Decks — Highcode",
+  title: "Decks · Highcode",
   description:
     "Generate on-brand presentations from a document or a prompt. A Highcode app.",
 };
