@@ -16,30 +16,63 @@ type PublicUser = {
   username: string;
   name: string;
   themeId: string | null;
+  groupId: string | null;
   role: Role;
+};
+
+type Group = {
+  id: string;
+  name: string;
+  themeId: string | null;
+  createdAt: number;
 };
 
 const inputClass =
   "flex h-9 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400";
 
+// Effective theme = per-user override if set, else the user's group theme, else none.
+// Mirrors resolveThemeId() on the server so the admin sees what generation will use.
+function effectiveTheme(
+  user: PublicUser,
+  groups: Group[]
+): { value: string | null; source: "override" | "group" | "none" } {
+  if (user.themeId) return { value: user.themeId, source: "override" };
+  if (user.groupId) {
+    const group = groups.find((g) => g.id === user.groupId);
+    if (group?.themeId) return { value: group.themeId, source: "group" };
+  }
+  return { value: null, source: "none" };
+}
+
 export default function AdminPage() {
   const [users, setUsers] = useState<PublicUser[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/users");
+      const [usersRes, groupsRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/groups"),
+      ]);
       setError(null);
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!usersRes.ok) {
+        const data = (await usersRes.json().catch(() => ({}))) as { error?: string };
         setError(data.error ?? "Failed to load users.");
         return;
       }
-      const data = (await res.json()) as { users: PublicUser[] };
-      setUsers(data.users);
+      if (!groupsRes.ok) {
+        const data = (await groupsRes.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Failed to load groups.");
+        return;
+      }
+      const usersData = (await usersRes.json()) as { users: PublicUser[] };
+      const groupsData = (await groupsRes.json()) as { groups: Group[] };
+      setUsers(usersData.users);
+      setGroups(groupsData.groups);
     } catch {
-      setError("Network error while loading users.");
+      setError("Network error while loading data.");
     } finally {
       setLoading(false);
     }
@@ -68,11 +101,12 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-10 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-10 space-y-10">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manage users</h1>
           <p className="text-slate-500 text-sm">
-            Create accounts and assign each user a Gamma theme ID. Their presentations use that theme.
+            Group users by client to share a Gamma theme, or set a per-user override. Each
+            presentation uses the override if set, otherwise the user&apos;s group theme.
           </p>
         </div>
 
@@ -82,12 +116,35 @@ export default function AdminPage() {
           </Alert>
         )}
 
-        <CreateUser onCreated={load} />
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Groups {groups.length > 0 && <span className="text-slate-400">({groups.length})</span>}
+            </h2>
+            <p className="text-xs text-slate-500">
+              A group holds one shared theme. Assign users to a group and they inherit it;
+              change the theme once to update every member.
+            </p>
+          </div>
+          <CreateGroup onCreated={load} />
+          {loading ? (
+            <p className="text-sm text-slate-400">Loading…</p>
+          ) : groups.length === 0 ? (
+            <p className="text-sm text-slate-400">No groups yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {groups.map((g) => (
+                <GroupRow key={g.id} group={g} onChanged={load} />
+              ))}
+            </div>
+          )}
+        </section>
 
-        <div className="space-y-3">
+        <section className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-700">
             Users {users.length > 0 && <span className="text-slate-400">({users.length})</span>}
           </h2>
+          <CreateUser groups={groups} onCreated={load} />
           {loading ? (
             <p className="text-sm text-slate-400">Loading…</p>
           ) : users.length === 0 ? (
@@ -95,20 +152,275 @@ export default function AdminPage() {
           ) : (
             <div className="space-y-2">
               {users.map((u) => (
-                <UserRow key={u.id} user={u} onChanged={load} />
+                <UserRow key={u.id} user={u} groups={groups} onChanged={load} />
               ))}
             </div>
           )}
-        </div>
+        </section>
       </main>
     </div>
   );
 }
 
-function CreateUser({ onCreated }: { onCreated: () => void }) {
+function CreateGroup({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [themeId, setThemeId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function reset() {
+    setName("");
+    setThemeId("");
+    setError(null);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, themeId }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Failed to create group.");
+        return;
+      }
+      reset();
+      setOpen(false);
+      onCreated();
+    } catch {
+      setError("Network error while creating group.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <Button variant="outline" onClick={() => setOpen(true)} className="gap-1.5">
+        <Plus className="h-4 w-4" />
+        Add group
+      </Button>
+    );
+  }
+
+  return (
+    <Card className="border-slate-200 shadow-sm">
+      <CardContent className="pt-6">
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="cg-name">Group name</Label>
+              <Input id="cg-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cg-theme">Gamma theme ID</Label>
+              <Input
+                id="cg-theme"
+                value={themeId}
+                onChange={(e) => setThemeId(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Creating…" : "Create group"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                reset();
+                setOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GroupRow({ group, onChanged }: { group: Group; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(group.name);
+  const [themeId, setThemeId] = useState(group.themeId ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/groups/${group.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, themeId }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Failed to save.");
+        return;
+      }
+      setEditing(false);
+      onChanged();
+    } catch {
+      setError("Network error while saving.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (
+      !confirm(
+        `Delete group "${group.name}"? Members will be unassigned (their per-user theme, if any, still applies).`
+      )
+    )
+      return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/groups/${group.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Failed to delete.");
+        return;
+      }
+      onChanged();
+    } catch {
+      setError("Network error while deleting.");
+    }
+  }
+
+  if (!editing) {
+    return (
+      <Card className="border-slate-200 shadow-sm">
+        <CardContent className="py-3 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <span className="font-medium text-slate-900 truncate">{group.name}</span>
+            <div className="text-xs text-slate-500 mt-0.5">
+              Theme:{" "}
+              {group.themeId ? (
+                <code className="text-slate-700">{group.themeId}</code>
+              ) : (
+                <span className="text-slate-400">none</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="icon" onClick={() => setEditing(true)} aria-label="Edit group">
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={remove} aria-label="Delete group">
+              <Trash2 className="h-4 w-4 text-red-600" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-indigo-200 shadow-sm">
+      <CardContent className="pt-5">
+        <form onSubmit={save} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">Editing {group.name}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setEditing(false)}
+              aria-label="Cancel edit"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor={`eg-name-${group.id}`}>Group name</Label>
+              <Input
+                id={`eg-name-${group.id}`}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`eg-theme-${group.id}`}>Gamma theme ID</Label>
+              <Input
+                id={`eg-theme-${group.id}`}
+                value={themeId}
+                onChange={(e) => setThemeId(e.target.value)}
+                placeholder="none"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GroupSelect({
+  id,
+  groups,
+  value,
+  onChange,
+}: {
+  id: string;
+  groups: Group[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select id={id} className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">No group</option>
+      {groups.map((g) => (
+        <option key={g.id} value={g.id}>
+          {g.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CreateUser({ groups, onCreated }: { groups: Group[]; onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
+  const [groupId, setGroupId] = useState("");
   const [themeId, setThemeId] = useState("");
   const [role, setRole] = useState<Role>("user");
   const [password, setPassword] = useState("");
@@ -118,6 +430,7 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
   function reset() {
     setUsername("");
     setName("");
+    setGroupId("");
     setThemeId("");
     setRole("user");
     setPassword("");
@@ -132,7 +445,7 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, name, themeId, role, password }),
+        body: JSON.stringify({ username, name, groupId, themeId, role, password }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -172,8 +485,17 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
               <Input id="c-name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="c-theme">Gamma theme ID</Label>
-              <Input id="c-theme" value={themeId} onChange={(e) => setThemeId(e.target.value)} placeholder="optional" />
+              <Label htmlFor="c-group">Group</Label>
+              <GroupSelect id="c-group" groups={groups} value={groupId} onChange={setGroupId} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="c-theme">Theme override</Label>
+              <Input
+                id="c-theme"
+                value={themeId}
+                onChange={(e) => setThemeId(e.target.value)}
+                placeholder="optional — overrides group theme"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="c-role">Role</Label>
@@ -182,7 +504,7 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
                 <option value="admin">admin</option>
               </select>
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <Label htmlFor="c-password">Password</Label>
               <Input
                 id="c-password"
@@ -223,14 +545,26 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-function UserRow({ user, onChanged }: { user: PublicUser; onChanged: () => void }) {
+function UserRow({
+  user,
+  groups,
+  onChanged,
+}: {
+  user: PublicUser;
+  groups: Group[];
+  onChanged: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user.name);
+  const [groupId, setGroupId] = useState(user.groupId ?? "");
   const [themeId, setThemeId] = useState(user.themeId ?? "");
   const [role, setRole] = useState<Role>(user.role);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const group = user.groupId ? groups.find((g) => g.id === user.groupId) : undefined;
+  const effective = effectiveTheme(user, groups);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -240,7 +574,7 @@ function UserRow({ user, onChanged }: { user: PublicUser; onChanged: () => void 
       const res = await fetch(`/api/admin/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, themeId, role, ...(password ? { password } : {}) }),
+        body: JSON.stringify({ name, groupId, themeId, role, ...(password ? { password } : {}) }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -287,8 +621,34 @@ function UserRow({ user, onChanged }: { user: PublicUser; onChanged: () => void 
                 </span>
               )}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5">
-              Theme: {user.themeId ? <code className="text-slate-700">{user.themeId}</code> : <span className="text-slate-400">none</span>}
+            <div className="text-xs text-slate-500 mt-0.5 space-x-3">
+              <span>
+                Group:{" "}
+                {group ? (
+                  <span className="text-slate-700">{group.name}</span>
+                ) : (
+                  <span className="text-slate-400">none</span>
+                )}
+              </span>
+              <span>
+                Override:{" "}
+                {user.themeId ? (
+                  <code className="text-slate-700">{user.themeId}</code>
+                ) : (
+                  <span className="text-slate-400">none</span>
+                )}
+              </span>
+              <span>
+                Effective:{" "}
+                {effective.value ? (
+                  <>
+                    <code className="text-slate-700">{effective.value}</code>
+                    <span className="text-slate-400"> ({effective.source})</span>
+                  </>
+                ) : (
+                  <span className="text-slate-400">none</span>
+                )}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -328,8 +688,17 @@ function UserRow({ user, onChanged }: { user: PublicUser; onChanged: () => void 
               <Input id={`e-name-${user.id}`} value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor={`e-theme-${user.id}`}>Gamma theme ID</Label>
-              <Input id={`e-theme-${user.id}`} value={themeId} onChange={(e) => setThemeId(e.target.value)} placeholder="none" />
+              <Label htmlFor={`e-group-${user.id}`}>Group</Label>
+              <GroupSelect id={`e-group-${user.id}`} groups={groups} value={groupId} onChange={setGroupId} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`e-theme-${user.id}`}>Theme override</Label>
+              <Input
+                id={`e-theme-${user.id}`}
+                value={themeId}
+                onChange={(e) => setThemeId(e.target.value)}
+                placeholder="optional — overrides group theme"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={`e-role-${user.id}`}>Role</Label>
@@ -343,7 +712,7 @@ function UserRow({ user, onChanged }: { user: PublicUser; onChanged: () => void 
                 <option value="admin">admin</option>
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor={`e-pw-${user.id}`}>Reset password</Label>
               <Input
                 id={`e-pw-${user.id}`}

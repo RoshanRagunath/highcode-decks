@@ -32,6 +32,7 @@ export async function POST(req: Request) {
     username?: unknown;
     name?: unknown;
     themeId?: unknown;
+    groupId?: unknown;
     role?: unknown;
     password?: unknown;
   };
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const themeId =
     typeof body.themeId === "string" && body.themeId.trim() ? body.themeId.trim() : null;
+  const groupId =
+    typeof body.groupId === "string" && body.groupId.trim() ? body.groupId.trim() : null;
   const role: Role = body.role === "admin" ? "admin" : "user";
   const password = typeof body.password === "string" ? body.password : "";
 
@@ -59,6 +62,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "That username is already taken." }, { status: 409 });
   }
 
-  const user = await createUser({ username, name, themeId, role, password });
+  const user = await createUser({ username, name, themeId, groupId, role, password });
   return Response.json({ user: toPublicUser(user) }, { status: 201 });
 }

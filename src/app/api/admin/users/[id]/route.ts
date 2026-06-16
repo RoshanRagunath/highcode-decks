@@ -33,6 +33,7 @@ export async function PATCH(
   let body: {
     name?: unknown;
     themeId?: unknown;
+    groupId?: unknown;
     role?: unknown;
     password?: unknown;
   };
@@ -46,6 +47,8 @@ export async function PATCH(
   if (typeof body.name === "string" && body.name.trim()) patch.name = body.name.trim();
   if (typeof body.themeId === "string")
     patch.themeId = body.themeId.trim() ? body.themeId.trim() : null;
+  if (typeof body.groupId === "string")
+    patch.groupId = body.groupId.trim() ? body.groupId.trim() : null;
   if (body.role === "admin" || body.role === "user") patch.role = body.role as Role;
   if (typeof body.password === "string" && body.password) {
     if (body.password.length < 8) {

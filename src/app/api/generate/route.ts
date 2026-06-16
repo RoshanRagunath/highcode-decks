@@ -1,6 +1,6 @@
 import mammoth from "mammoth";
 import { getSession } from "@/lib/session";
-import { findById } from "@/lib/users";
+import { findById, resolveThemeId } from "@/lib/users";
 
 export const maxDuration = 120;
 
@@ -53,14 +53,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "Server misconfiguration" }, { status: 500 });
   }
 
-  // Identify the logged-in user and read their current theme from the DB, so an
-  // admin's theme change takes effect immediately and a deleted user fails closed.
+  // Identify the logged-in user and resolve their current effective theme from the
+  // DB (own override, else their group's theme), so an admin's theme change takes
+  // effect immediately and a deleted user fails closed.
   const session = await getSession();
   const user = session ? await findById(session.uid) : null;
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const themeId = user.themeId;
+  const themeId = await resolveThemeId(user);
 
   let formData: FormData;
   try {

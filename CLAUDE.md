@@ -67,13 +67,22 @@ D1 binding: `DB` (database `gamma-generator-db`) — declared in `wrangler.jsonc
   The signed `gg_session` cookie carries `{ uid, role }`, verified with `AUTH_SECRET`.
 - Auth primitives in `src/lib/auth.ts` (Web Crypto, edge-safe): session sign/verify (HMAC) +
   PBKDF2 password hashing. `src/lib/session.ts` reads the current session in route handlers.
-- Users live in D1, accessed only through `src/lib/users.ts` (the one SQL file; binding `DB`
-  via `getCloudflareContext()`). `ensureSeeded()` creates the first admin from
-  `ADMIN_USERNAME`/`ADMIN_PASSWORD`. Schema in `migrations/0001_init.sql`.
-- Admin UI at `/admin` (CRUD via `/api/admin/users[/:id]`); each handler re-checks admin role.
-- `/api/generate` looks up the logged-in user, reads their current `themeId`, and injects it
-  into the n8n payload (JSON `themeId` field, or `form.append("themeId", …)` for file uploads),
-  so admin theme changes apply on the next generation and deleted users fail closed (`401`).
+- Users and groups live in D1, accessed only through `src/lib/users.ts` (the one SQL file;
+  binding `DB` via `getCloudflareContext()`). `ensureSeeded()` creates the first admin from
+  `ADMIN_USERNAME`/`ADMIN_PASSWORD`. Schema in `migrations/0001_init.sql` (`users`) and
+  `migrations/0002_groups.sql` (`groups` table + `users.group_id`).
+- **Themes — groups + per-user override.** A `groups` row carries a shared `theme_id`; a user
+  may belong to one group (`users.group_id`, nullable). The user's own `theme_id` is an
+  optional override. Effective theme = `user.themeId ?? group.themeId`, computed by
+  `resolveThemeId(user)` in `src/lib/users.ts`. D1 doesn't enforce FKs, so `deleteGroup()`
+  nulls members' `group_id` before dropping the group (no orphaned references).
+- Admin UI at `/admin` manages both groups and users (CRUD via `/api/admin/groups[/:id]` and
+  `/api/admin/users[/:id]`); each handler re-checks admin role. The users list shows each
+  user's group, override, and resolved effective theme.
+- `/api/generate` looks up the logged-in user and calls `resolveThemeId(user)` to get the
+  effective theme, then injects it into the n8n payload (JSON `themeId` field, or
+  `form.append("themeId", …)` for file uploads), so admin theme/group changes apply on the
+  next generation and deleted users fail closed (`401`).
 - Single API route at `/api/generate` accepts `multipart/form-data` with a `file` (File) and/or `prompt` (string) field.
 - Server validates MIME type and file size before forwarding to n8n.
 - n8n returns `{ fileBase64 | fileData, fileName?, mimeType? }`; if the shape differs, update the destructuring in `src/app/api/generate/route.ts`.
