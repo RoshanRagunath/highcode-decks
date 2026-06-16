@@ -48,7 +48,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="text-xl text-slate-500 max-w-xl mx-auto leading-relaxed">
-              Upload a document or describe your idea, and Decks turns it into a polished Gamma
+              Upload a document or describe your idea. Decks turns it into a polished Gamma
               presentation using your team&apos;s theme. Built by Highcode.
             </p>
 
@@ -88,7 +88,7 @@ export default function LandingPage() {
                   bg: "bg-indigo-50",
                   title: "Bring your content",
                   description:
-                    "Upload a PDF, Word doc, text or Markdown file, or just type a prompt. Decks structures it into slides.",
+                    "Upload a PDF, Word doc, text or Markdown file. Or just type a prompt. Decks structures it into slides.",
                 },
                 {
                   icon: <Wand2 className="h-5 w-5 text-violet-600" />,

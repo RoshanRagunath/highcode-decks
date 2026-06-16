@@ -159,7 +159,7 @@ export default function GeneratePage() {
                 Create your presentation
               </h1>
               <p className="text-slate-500 text-sm">
-                Write a prompt or upload a document, and we&apos;ll generate a full Gamma presentation in under a minute.
+                Write a prompt or upload a document. We&apos;ll generate a full Gamma presentation in under a minute.
               </p>
             </div>
 
