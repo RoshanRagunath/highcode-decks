@@ -8,6 +8,24 @@
 
 > Branding note: the user-facing name is **Decks**, but the repo, Cloudflare Worker, and domain keep the original `gamma-generator` / `gamma.highcode.nl` names.
 
+## Copy style
+
+All **user-facing copy** (page text, button/label text, placeholders, and API error
+messages returned to the browser) must follow these rules:
+
+- **No em-dashes (`—`) or en-dashes (`–`).** Rewrite as two sentences, or use a comma,
+  colon, or parentheses. Example: "in the background — please try again" → "in the
+  background. Please try again."
+- **No Oxford / serial comma.** Drop the comma before the final `and`/`or` in a list of
+  three or more. Example: "PDF, DOCX, TXT, or MD" → "PDF, DOCX, TXT or MD".
+- **Avoid the comma-before-conjunction join** ("…, and we'll generate"). Prefer two short
+  sentences instead ("… . We'll generate …").
+- Use `·` (middle dot) as the separator in titles/footers, not a dash — e.g. the page
+  `<title>` is "Decks · Highcode".
+
+These apply only to copy users read. Internal code comments are exempt. The box-drawing
+separators (`──`) in JSX comments are not dashes and can stay.
+
 ## Stack
 
 | Layer | Choice | Why |
