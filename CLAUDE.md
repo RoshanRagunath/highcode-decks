@@ -97,6 +97,13 @@ D1 binding: `DB` (database `gamma-generator-db`) — declared in `wrangler.jsonc
 - Admin UI at `/admin` manages both groups and users (CRUD via `/api/admin/groups[/:id]` and
   `/api/admin/users[/:id]`); each handler re-checks admin role. The users list shows each
   user's group, override, and resolved effective theme.
+- **Upload history.** Every generation attempt that passes validation is logged to the
+  `generations` D1 table (`migrations/0003_generations.sql`, accessed via `src/lib/history.ts`).
+  `/api/generate` calls `recordGeneration()` at each outcome (success or post-n8n error);
+  logging swallows its own errors so it never breaks a generation. The admin page reads
+  `/api/admin/history` (GET, admin-only, 200 most recent) and renders a read-only table of
+  who uploaded what and whether it succeeded. Identity (username + display name) is snapshotted
+  on the row so the log survives a later user delete.
 - `/api/generate` looks up the logged-in user and calls `resolveThemeId(user)` to get the
   effective theme, then injects it into the n8n payload (JSON `themeId` field, or
   `form.append("themeId", …)` for file uploads), so admin theme/group changes apply on the
