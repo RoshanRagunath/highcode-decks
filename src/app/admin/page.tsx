@@ -27,6 +27,22 @@ type Group = {
   createdAt: number;
 };
 
+type Generation = {
+  id: string;
+  userId: string | null;
+  username: string;
+  userName: string;
+  kind: "file" | "prompt";
+  fileName: string | null;
+  fileType: string | null;
+  fileSize: number | null;
+  promptExcerpt: string | null;
+  themeId: string | null;
+  status: "ok" | "error";
+  error: string | null;
+  createdAt: number;
+};
+
 const inputClass =
   "flex h-9 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400";
 
@@ -44,17 +60,36 @@ function effectiveTheme(
   return { value: null, source: "none" };
 }
 
+function formatBytes(bytes: number | null): string {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatWhen(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function AdminPage() {
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [history, setHistory] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [usersRes, groupsRes] = await Promise.all([
+      const [usersRes, groupsRes, historyRes] = await Promise.all([
         fetch("/api/admin/users"),
         fetch("/api/admin/groups"),
+        fetch("/api/admin/history"),
       ]);
       setError(null);
       if (!usersRes.ok) {
@@ -67,10 +102,17 @@ export default function AdminPage() {
         setError(data.error ?? "Failed to load groups.");
         return;
       }
+      if (!historyRes.ok) {
+        const data = (await historyRes.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Failed to load history.");
+        return;
+      }
       const usersData = (await usersRes.json()) as { users: PublicUser[] };
       const groupsData = (await groupsRes.json()) as { groups: Group[] };
+      const historyData = (await historyRes.json()) as { generations: Generation[] };
       setUsers(usersData.users);
       setGroups(groupsData.groups);
+      setHistory(historyData.generations);
     } catch {
       setError("Network error while loading data.");
     } finally {
@@ -97,7 +139,7 @@ export default function AdminPage() {
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm font-medium">Back to generator</span>
           </Link>
-          <span className="text-xs text-slate-500">Admin · Users</span>
+          <span className="text-xs text-slate-500">Admin · Users · History</span>
         </div>
       </header>
 
@@ -157,8 +199,93 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Upload history {history.length > 0 && <span className="text-slate-400">({history.length})</span>}
+            </h2>
+            <p className="text-xs text-slate-500">
+              Every generation attempt, newest first. Shows who uploaded what and whether it
+              succeeded. The 200 most recent are shown.
+            </p>
+          </div>
+          {loading ? (
+            <p className="text-sm text-slate-400">Loading…</p>
+          ) : history.length === 0 ? (
+            <p className="text-sm text-slate-400">No uploads yet.</p>
+          ) : (
+            <HistoryTable history={history} />
+          )}
+        </section>
       </main>
     </div>
+  );
+}
+
+function HistoryTable({ history }: { history: Generation[] }) {
+  return (
+    <Card className="border-slate-200 shadow-sm py-0">
+      <CardContent className="p-0 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">When</th>
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">User</th>
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Type</th>
+              <th className="px-4 py-2.5 font-medium">Upload</th>
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((g) => (
+              <tr key={g.id} className="border-b border-slate-100 last:border-0 align-top">
+                <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">
+                  {formatWhen(g.createdAt)}
+                </td>
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  <span className="text-slate-900">{g.userName}</span>
+                  <span className="text-slate-400"> @{g.username}</span>
+                </td>
+                <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
+                  {g.kind === "file" ? "File" : "Prompt"}
+                </td>
+                <td className="px-4 py-2.5 text-slate-700 max-w-xs">
+                  {g.kind === "file" ? (
+                    <div className="min-w-0">
+                      <span className="block truncate" title={g.fileName ?? ""}>
+                        {g.fileName ?? "(unnamed file)"}
+                      </span>
+                      {g.fileSize != null && (
+                        <span className="text-xs text-slate-400">{formatBytes(g.fileSize)}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="block truncate text-slate-500" title={g.promptExcerpt ?? ""}>
+                      {g.promptExcerpt ? `"${g.promptExcerpt}"` : "(empty prompt)"}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  {g.status === "ok" ? (
+                    <span className="text-[10px] uppercase tracking-wide bg-emerald-100 text-emerald-700 rounded px-1.5 py-0.5">
+                      ok
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[10px] uppercase tracking-wide bg-red-100 text-red-700 rounded px-1.5 py-0.5"
+                      title={g.error ?? ""}
+                    >
+                      error
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 }
 

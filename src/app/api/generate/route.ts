@@ -173,6 +173,7 @@ export async function POST(req: Request) {
       : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
   if (!fileData) {
+    await logOutcome("error", "Generation service returned an unexpected response");
     return Response.json(
       {
         error: `Generation service returned an unexpected response. Received keys: ${Object.keys(data).join(", ")}`,
@@ -187,11 +188,14 @@ export async function POST(req: Request) {
     buffer = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
   } catch {
+    await logOutcome("error", "Generation service returned invalid file data");
     return Response.json(
       { error: "Generation service returned invalid file data" },
       { status: 502 }
     );
   }
+
+  await logOutcome("ok");
 
   return new Response(buffer.buffer as ArrayBuffer, {
     headers: {
