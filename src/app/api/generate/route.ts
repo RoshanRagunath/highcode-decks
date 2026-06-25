@@ -1,6 +1,7 @@
 import mammoth from "mammoth";
 import { getSession } from "@/lib/session";
 import { findById, resolveThemeId } from "@/lib/users";
+import { recordGeneration, type GenerationStatus } from "@/lib/history";
 
 export const maxDuration = 120;
 
@@ -92,6 +93,28 @@ export async function POST(req: Request) {
     }
   }
 
+  // Record this attempt (input metadata is known now; status is set at the outcome).
+  // Logging must never break the user's generation, so it swallows its own errors.
+  const logOutcome = async (status: GenerationStatus, error?: string) => {
+    try {
+      await recordGeneration({
+        userId: user.id,
+        username: user.username,
+        userName: user.name,
+        kind: file ? "file" : "prompt",
+        fileName: file?.name ?? null,
+        fileType: file?.type ?? null,
+        fileSize: file?.size ?? null,
+        promptExcerpt: file ? null : (prompt?.trim().slice(0, 140) ?? null),
+        themeId,
+        status,
+        error: error ?? null,
+      });
+    } catch (err) {
+      console.error("Failed to record generation history:", err);
+    }
+  };
+
   let n8nRequest: RequestInit;
   try {
     n8nRequest = await buildN8nRequest(file, prompt, themeId);
@@ -108,6 +131,7 @@ export async function POST(req: Request) {
     n8nRes = await fetch(webhookUrl, n8nRequest);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Request failed";
+    await logOutcome("error", `Could not reach generation service: ${message}`);
     return Response.json(
       { error: `Could not reach the generation service: ${message}` },
       { status: 502 }
@@ -116,6 +140,7 @@ export async function POST(req: Request) {
 
   if (!n8nRes.ok) {
     const body = await n8nRes.text().catch(() => "(unreadable)");
+    await logOutcome("error", `Generation service error (${n8nRes.status})`);
     return Response.json(
       { error: `Generation service error (${n8nRes.status}): ${body}` },
       { status: 502 }
@@ -126,6 +151,7 @@ export async function POST(req: Request) {
   try {
     data = (await n8nRes.json()) as Record<string, unknown>;
   } catch {
+    await logOutcome("error", "Generation service returned an unreadable response");
     return Response.json(
       { error: "Generation service returned an unreadable response" },
       { status: 502 }
